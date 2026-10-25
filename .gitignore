@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+local.settings.json
+.env
+infra/main.json
+*.zip
+.python_packages/
+bin/
+obj/

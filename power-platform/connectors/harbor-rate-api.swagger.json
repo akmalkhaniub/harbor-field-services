@@ -1,0 +1,111 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Harbor Rate API",
+    "description": "Account-scoped rate lookup and idempotent quotes. This connector cannot send client email or approve a scope change.",
+    "version": "1.0.0"
+  },
+  "host": "example.invalid",
+  "basePath": "/api",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "securityDefinitions": {
+    "oauth2-auth": {
+      "type": "oauth2",
+      "flow": "accessCode",
+      "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "scopes": {
+        "api://harbor-rate/.default": "Call the Harbor rate API"
+      }
+    }
+  },
+  "security": [{ "oauth2-auth": ["api://harbor-rate/.default"] }],
+  "paths": {
+    "/rates": {
+      "get": {
+        "operationId": "GetRate",
+        "summary": "Get the hourly rate for a role on an account",
+        "x-ms-visibility": "important",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "x-ms-summary": "Role",
+            "description": "consultant, senior, or principal",
+            "x-ms-url-encoding": "single"
+          },
+          {
+            "name": "accountCode",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "x-ms-summary": "Account code",
+            "x-ms-url-encoding": "single"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rate",
+            "schema": { "$ref": "#/definitions/Rate" }
+          }
+        }
+      }
+    },
+    "/quotes": {
+      "post": {
+        "operationId": "CreateQuote",
+        "summary": "Create an idempotent quote",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/QuoteRequest" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote",
+            "schema": { "$ref": "#/definitions/Quote" }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Rate": {
+      "type": "object",
+      "properties": {
+        "accountCode": { "type": "string" },
+        "role": { "type": "string" },
+        "hourlyUsd": { "type": "integer" },
+        "discountPercent": { "type": "integer" },
+        "currency": { "type": "string" }
+      }
+    },
+    "QuoteRequest": {
+      "type": "object",
+      "required": ["idempotencyKey", "accountCode", "role", "hours", "requestedBy"],
+      "properties": {
+        "idempotencyKey": { "type": "string" },
+        "accountCode": { "type": "string" },
+        "role": { "type": "string" },
+        "hours": { "type": "integer", "format": "int32" },
+        "afterHours": { "type": "boolean" },
+        "requestedBy": { "type": "string" }
+      }
+    },
+    "Quote": {
+      "type": "object",
+      "properties": {
+        "quoteId": { "type": "string" },
+        "amountUsd": { "type": "number" },
+        "replayed": { "type": "boolean" }
+      }
+    }
+  }
+}

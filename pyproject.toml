@@ -1,0 +1,15 @@
+[project]
+name = "harbor-field-services"
+version = "0.1.0"
+description = "Harbor Delivery Desk and Control Plane portfolio"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+foundry = ["azure-ai-projects>=2.3.0", "azure-identity>=1.19.0"]
+api = ["azure-functions>=1.21.0", "pyodbc>=5.1.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["services/rate-api", "services/eval-harness"]
+testpaths = ["tests"]

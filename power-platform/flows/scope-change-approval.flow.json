@@ -1,0 +1,226 @@
+{
+  "name": "hf_scope_change_approval",
+  "description": "Validates a scope-change request, rejects duplicates, looks up a rate, and waits for a person before any client update.",
+  "connectionReferences": {
+    "hf_sharedcommondataserviceforapps": {
+      "connectorId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+      "connectionLogicalName": "hf_sharedcommondataserviceforapps"
+    },
+    "hf_sharedapprovals": {
+      "connectorId": "/providers/Microsoft.PowerApps/apis/shared_approvals",
+      "connectionLogicalName": "hf_sharedapprovals"
+    },
+    "hf_sharedteams": {
+      "connectorId": "/providers/Microsoft.PowerApps/apis/shared_teams",
+      "connectionLogicalName": "hf_sharedteams"
+    },
+    "hf_rateapi": {
+      "connectorId": "/providers/Microsoft.PowerApps/apis/shared_hf-5frateapi",
+      "connectionLogicalName": "hf_rateapi"
+    }
+  },
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "defaultValue": {}, "type": "Object" },
+      "$authentication": { "defaultValue": {}, "type": "SecureObject" },
+      "CoordinatorEmail": { "defaultValue": "@parameters('hf_CoordinatorEmail')", "type": "String" },
+      "OperationsChannel": { "defaultValue": "Harbor Operations", "type": "String" }
+    },
+    "triggers": {
+      "When_a_request_row_is_added": {
+        "type": "OpenApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "hf_sharedcommondataserviceforapps",
+            "operationId": "SubscribeWebhookTrigger",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+          },
+          "parameters": {
+            "subscriptionRequest/message": 1,
+            "subscriptionRequest/entityname": "hf_servicerequest",
+            "subscriptionRequest/scope": 4
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      }
+    },
+    "actions": {
+      "Try": {
+        "type": "Scope",
+        "actions": {
+          "Is_valid": {
+            "type": "If",
+            "expression": "@and(greaterOrEquals(coalesce(triggerBody()?['hf_hours'], 0), 4), not(empty(triggerBody()?['hf_idempotencykey'])), not(empty(triggerBody()?['hf_accountcode'])))",
+            "actions": {
+              "Lookup_existing": {
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "hf_sharedcommondataserviceforapps",
+                    "operationId": "ListRecords",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                  },
+                  "parameters": {
+                    "entityName": "hf_servicerequests",
+                    "$filter": "hf_idempotencykey eq '@{triggerBody()?['hf_idempotencykey']}' and hf_servicerequestid ne @{triggerBody()?['hf_servicerequestid']}"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              },
+              "Get_rate": {
+                "type": "OpenApiConnection",
+                "runAfter": { "Lookup_existing": ["SUCCEEDED"] },
+                "inputs": {
+                  "host": {
+                    "connectionName": "hf_rateapi",
+                    "operationId": "GetRate",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_hf-5frateapi"
+                  },
+                  "parameters": {
+                    "role": "@triggerBody()?['hf_role']",
+                    "accountCode": "@triggerBody()?['hf_accountcode']"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              },
+              "Needs_approval": {
+                "type": "If",
+                "expression": "@greaterOrEquals(coalesce(triggerBody()?['hf_amount'], 0), 5000)",
+                "runAfter": { "Get_rate": ["SUCCEEDED"] },
+                "actions": {
+                  "Start_and_wait_for_an_approval": {
+                    "type": "OpenApiConnectionWebhook",
+                    "limit": { "timeout": "P3D" },
+                    "inputs": {
+                      "host": {
+                        "connectionName": "hf_sharedapprovals",
+                        "operationId": "StartAndWaitForAnApproval",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals"
+                      },
+                      "parameters": {
+                        "approvalType": "Basic",
+                        "WebhookApprovalCreationInput/title": "Scope change @{triggerBody()?['hf_accountcode']}",
+                        "WebhookApprovalCreationInput/assignedTo": "@parameters('CoordinatorEmail')",
+                        "WebhookApprovalCreationInput/details": "Amount @{triggerBody()?['hf_amount']} USD. Correlation @{triggerBody()?['hf_idempotencykey']}. The flow will not email the client."
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Record_below_threshold": {
+                      "type": "Compose",
+                      "inputs": "Below USD 5000. Recorded only. No client message is sent."
+                    }
+                  }
+                }
+              },
+              "Update_request": {
+                "type": "OpenApiConnection",
+                "runAfter": { "Needs_approval": ["SUCCEEDED"] },
+                "inputs": {
+                  "host": {
+                    "connectionName": "hf_sharedcommondataserviceforapps",
+                    "operationId": "UpdateRecord",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                  },
+                  "parameters": {
+                    "entityName": "hf_servicerequests",
+                    "recordId": "@triggerBody()?['hf_servicerequestid']",
+                    "item/hf_status": "ReadyForReview",
+                    "item/hf_ratehourly": "@body('Get_rate')?['hourlyUsd']"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            },
+            "else": {
+              "actions": {
+                "Record_validation_failure": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "hf_sharedcommondataserviceforapps",
+                      "operationId": "UpdateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "hf_servicerequests",
+                      "recordId": "@triggerBody()?['hf_servicerequestid']",
+                      "item/hf_status": "Rejected",
+                      "item/hf_failurereason": "Validation failed. Minimum 4 hours, an account code, and an idempotency key are required."
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Catch": {
+        "type": "Scope",
+        "runAfter": { "Try": ["FAILED", "TIMED_OUT"] },
+        "actions": {
+          "Add_dead_letter": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "hf_sharedcommondataserviceforapps",
+                "operationId": "CreateRecord",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+              },
+              "parameters": {
+                "entityName": "hf_deadletters",
+                "item/hf_correlationid": "@coalesce(triggerBody()?['hf_idempotencykey'], guid())",
+                "item/hf_reason": "@{result('Try')[0]?['error']?['message']}",
+                "item/hf_status": "Open"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Notify_operations": {
+            "type": "OpenApiConnection",
+            "runAfter": { "Add_dead_letter": ["SUCCEEDED", "FAILED"] },
+            "inputs": {
+              "host": {
+                "connectionName": "hf_sharedteams",
+                "operationId": "PostMessageToConversation",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams"
+              },
+              "parameters": {
+                "poster": "Bot",
+                "location": "Channel",
+                "body/messageBody": "Harbor request failed. Correlation @{coalesce(triggerBody()?['hf_idempotencykey'], 'missing')}."
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          }
+        }
+      },
+      "Write_trace": {
+        "type": "OpenApiConnection",
+        "runAfter": {
+          "Try": ["SUCCEEDED", "FAILED", "TIMED_OUT", "SKIPPED"],
+          "Catch": ["SUCCEEDED", "FAILED", "SKIPPED"]
+        },
+        "inputs": {
+          "host": {
+            "connectionName": "hf_sharedcommondataserviceforapps",
+            "operationId": "CreateRecord",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+          },
+          "parameters": {
+            "entityName": "hf_agenttraces",
+            "item/hf_correlationid": "@coalesce(triggerBody()?['hf_idempotencykey'], 'missing')",
+            "item/hf_outcome": "@{actions('Try')?['status']}"
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+-- Run after the Function app exists. Replace the bracketed name with the app's managed identity.
+-- CREATE USER [func-hf-dev-sample01] FROM EXTERNAL PROVIDER;
+-- ALTER ROLE db_datareader ADD MEMBER [func-hf-dev-sample01];
+-- ALTER ROLE db_datawriter ADD MEMBER [func-hf-dev-sample01];

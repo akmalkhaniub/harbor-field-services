@@ -1,0 +1,41 @@
+table EvalResult
+	lineageTag: 12121212-1212-4121-8121-121212121212
+
+	column CaseId
+		dataType: string
+		isKey
+		lineageTag: 13131313-1313-4131-8131-131313131313
+		summarizeBy: none
+		sourceColumn: CaseId
+
+	column Passed
+		dataType: boolean
+		lineageTag: 14141414-1414-4141-8141-141414141414
+		summarizeBy: none
+		sourceColumn: Passed
+
+	measure 'Eval pass rate' =
+			DIVIDE (
+			    CALCULATE ( COUNTROWS ( EvalResult ), EvalResult[Passed] = TRUE () ),
+			    COUNTROWS ( EvalResult )
+			)
+		formatString: 0.0%
+		displayFolder: Quality
+		lineageTag: 15151515-1515-4151-8151-151515151515
+
+	partition EvalResult = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(
+				        {
+				            {"G01", true},
+				            {"P02", true},
+				            {"R01", false}
+				        },
+				        type table [CaseId = text, Passed = logical]
+				    )
+				in
+				    Source
+
+	annotation PBI_ResultType = Table

@@ -1,0 +1,73 @@
+table ServiceRequest
+	lineageTag: 66666666-6666-4666-8666-666666666666
+
+	column RequestId
+		dataType: string
+		isKey
+		lineageTag: 77777777-7777-4777-8777-777777777777
+		summarizeBy: none
+		sourceColumn: RequestId
+
+	column AccountCode
+		dataType: string
+		lineageTag: 88888888-8888-4888-8888-888888888888
+		summarizeBy: none
+		sourceColumn: AccountCode
+
+	column Status
+		dataType: string
+		lineageTag: 99999999-9999-4999-8999-999999999999
+		summarizeBy: none
+		sourceColumn: Status
+
+	column CycleHours
+		dataType: double
+		lineageTag: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+		formatString: 0.0
+		summarizeBy: sum
+		sourceColumn: CycleHours
+
+	column AmountUsd
+		dataType: double
+		lineageTag: bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+		formatString: "\$#,0.00"
+		summarizeBy: sum
+		sourceColumn: AmountUsd
+
+	measure 'Failure rate' =
+			DIVIDE (
+			    CALCULATE ( COUNTROWS ( ServiceRequest ), ServiceRequest[Status] = "Failed" ),
+			    COUNTROWS ( ServiceRequest )
+			)
+		formatString: 0.0%
+		displayFolder: Operations
+		lineageTag: cccccccc-cccc-4ccc-8ccc-cccccccccccc
+
+	measure 'Average cycle hours' = AVERAGE ( ServiceRequest[CycleHours] )
+		formatString: 0.0
+		displayFolder: Operations
+		lineageTag: dddddddd-dddd-4ddd-8ddd-dddddddddddd
+
+	measure 'Open approvals' =
+			CALCULATE ( COUNTROWS ( ServiceRequest ), ServiceRequest[Status] = "ReadyForReview" )
+		formatString: 0
+		displayFolder: Operations
+		lineageTag: eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee
+
+	partition ServiceRequest = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(
+				        {
+				            {"SR-1001", "NORTH", "Failed", 12, 8000},
+				            {"SR-1002", "NORTH", "ReadyForReview", 6, 1440},
+				            {"SR-1003", "BRIGHT", "ReadyForReview", 30, 9000},
+				            {"SR-1004", "BRIGHT", "Failed", 2, 400}
+				        },
+				        type table [RequestId = text, AccountCode = text, Status = text, CycleHours = number, AmountUsd = number]
+				    )
+				in
+				    Source
+
+	annotation PBI_ResultType = Table

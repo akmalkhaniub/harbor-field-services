@@ -1,0 +1,7 @@
+relationship ServiceRequest_Account
+	fromColumn: ServiceRequest.AccountCode
+	toColumn: Account.AccountCode
+
+relationship UserAccount_Account
+	fromColumn: UserAccount.AccountCode
+	toColumn: Account.AccountCode

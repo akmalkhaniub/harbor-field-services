@@ -1,0 +1,43 @@
+{
+  "name": "vendor_intake",
+  "description": "Rejected vendor delivery. Kept in the repo so the review comments have a target.",
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": { "schema": {} }
+      }
+    },
+    "actions": {
+      "Read_sharepoint": {
+        "type": "Compose",
+        "inputs": "https://contoso.sharepoint.com/sites/finance/Shared Documents/Invoices"
+      },
+      "Start_and_wait_for_an_approval": {
+        "type": "OpenApiConnectionWebhook",
+        "runAfter": { "Read_sharepoint": ["SUCCEEDED"] },
+        "inputs": {
+          "host": {
+            "connectionName": "shared_approvals",
+            "operationId": "StartAndWaitForAnApproval",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals"
+          },
+          "parameters": {
+            "approvalType": "Basic",
+            "WebhookApprovalCreationInput/title": "Approve invoice",
+            "WebhookApprovalCreationInput/assignedTo": "finance@contoso.com",
+            "WebhookApprovalCreationInput/details": "Auto-continue after approval and post back to the same SharePoint folder."
+          }
+        }
+      },
+      "Mark_approved": {
+        "type": "Compose",
+        "runAfter": { "Start_and_wait_for_an_approval": ["SUCCEEDED"] },
+        "inputs": "approved"
+      }
+    }
+  }
+}

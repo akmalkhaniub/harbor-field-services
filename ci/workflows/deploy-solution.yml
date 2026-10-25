@@ -1,0 +1,72 @@
+name: deploy-solution
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target Power Platform environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+      - name: Authenticate with federated credentials
+        run: pac auth create --githubFederated --tenant ${{ vars.AZURE_TENANT_ID }} --applicationId ${{ vars.POWERPLATFORM_APP_ID }} --environment ${{ vars.DATAVERSE_URL }}
+      - name: WhoAmI
+        uses: microsoft/powerplatform-actions/who-am-i@v1
+        with:
+          environment-url: ${{ vars.DATAVERSE_URL }}
+          app-id: ${{ vars.POWERPLATFORM_APP_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+      - name: Require the solution package
+        run: |
+          if [ ! -f out/HarborDeliveryDesk.zip ]; then
+            echo "Place the solution exported from Dev at out/HarborDeliveryDesk.zip before dispatching this workflow."
+            exit 1
+          fi
+      - name: Solution checker
+        run: pac solution check --path out/HarborDeliveryDesk.zip
+      - name: Render deployment settings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          text = Path("power-platform/settings/HarborDeliveryDesk.settings.template.json").read_text(encoding="utf-8")
+          replacements = {
+              "__RATE_API_URL__": os.environ["RATE_API_URL"],
+              "__COORDINATOR_EMAIL__": os.environ["COORDINATOR_EMAIL"],
+              "__ENVIRONMENT_NAME__": os.environ["ENVIRONMENT_NAME"],
+              "__DATAVERSE_CONNECTION_ID__": os.environ["DATAVERSE_CONNECTION_ID"],
+              "__APPROVALS_CONNECTION_ID__": os.environ["APPROVALS_CONNECTION_ID"],
+              "__TEAMS_CONNECTION_ID__": os.environ["TEAMS_CONNECTION_ID"],
+              "__SHAREPOINT_CONNECTION_ID__": os.environ["SHAREPOINT_CONNECTION_ID"],
+              "__RATE_API_CONNECTION_ID__": os.environ["RATE_API_CONNECTION_ID"],
+          }
+          for key, value in replacements.items():
+              text = text.replace(key, value)
+          Path("power-platform/settings/rendered.json").write_text(text, encoding="utf-8")
+          PY
+        env:
+          RATE_API_URL: ${{ vars.RATE_API_URL }}
+          COORDINATOR_EMAIL: ${{ vars.COORDINATOR_EMAIL }}
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          DATAVERSE_CONNECTION_ID: ${{ vars.DATAVERSE_CONNECTION_ID }}
+          APPROVALS_CONNECTION_ID: ${{ vars.APPROVALS_CONNECTION_ID }}
+          TEAMS_CONNECTION_ID: ${{ vars.TEAMS_CONNECTION_ID }}
+          SHAREPOINT_CONNECTION_ID: ${{ vars.SHAREPOINT_CONNECTION_ID }}
+          RATE_API_CONNECTION_ID: ${{ vars.RATE_API_CONNECTION_ID }}
+      - name: Import solution
+        run: pac solution import --path out/HarborDeliveryDesk.zip --settings-file power-platform/settings/rendered.json --publish-changes --activate-plugins --force-overwrite

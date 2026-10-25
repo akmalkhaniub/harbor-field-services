@@ -1,0 +1,37 @@
+table CostDaily
+	lineageTag: 16161616-1616-4161-8161-161616161616
+
+	column Day
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 17171717-1717-4171-8171-171717171717
+		summarizeBy: none
+		sourceColumn: Day
+
+	column AmountUsd
+		dataType: double
+		formatString: "\$#,0.00"
+		lineageTag: 18181818-1818-4181-8181-181818181818
+		summarizeBy: sum
+		sourceColumn: AmountUsd
+
+	measure Spend = SUM ( CostDaily[AmountUsd] )
+		formatString: "\$#,0.00"
+		displayFolder: Cost
+		lineageTag: 19191919-1919-4191-8191-191919191919
+
+	partition CostDaily = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(
+				        {
+				            {#date(2026, 10, 20), 1.20},
+				            {#date(2026, 10, 21), 0.80}
+				        },
+				        type table [Day = datetime, AmountUsd = number]
+				    )
+				in
+				    Source
+
+	annotation PBI_ResultType = Table

@@ -1,0 +1,39 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+ref table Account
+ref table UserAccount
+ref table ServiceRequest
+ref table EvalResult
+ref table CostDaily
+
+ref role 'Account team'
+ref role Finance
+
+annotation PBI_QueryOrder = ["Account","UserAccount","ServiceRequest","EvalResult","CostDaily"]
+
+role 'Account team'
+	modelPermission: read
+
+	tablePermission Account =
+			VAR VisibleAccounts =
+			    CALCULATETABLE (
+			        VALUES ( UserAccount[AccountCode] ),
+			        UserAccount[UserPrincipalName] = USERPRINCIPALNAME ()
+			    )
+			RETURN
+			    Account[AccountCode] IN VisibleAccounts
+
+	tablePermission UserAccount =
+			UserAccount[UserPrincipalName] = USERPRINCIPALNAME ()
+
+	tablePermission CostDaily =
+			CostDaily[AmountUsd] = -1
+
+role Finance
+	modelPermission: read

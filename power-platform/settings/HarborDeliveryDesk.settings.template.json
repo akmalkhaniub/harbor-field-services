@@ -1,0 +1,38 @@
+{
+  "EnvironmentVariables": [
+    {
+      "SchemaName": "hf_RateApiUrl",
+      "Value": "__RATE_API_URL__"
+    },
+    {
+      "SchemaName": "hf_ApprovalThresholdUsd",
+      "Value": "5000"
+    },
+    {
+      "SchemaName": "hf_OperationsTeamId",
+      "Value": "__OPERATIONS_TEAM_ID__"
+    }
+  ],
+  "ConnectionReferences": [
+    {
+      "LogicalName": "hf_sharedcommondataserviceforapps",
+      "ConnectionId": "__DATAVERSE_CONNECTION_ID__",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+    },
+    {
+      "LogicalName": "hf_sharedapprovals",
+      "ConnectionId": "__APPROVALS_CONNECTION_ID__",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_approvals"
+    },
+    {
+      "LogicalName": "hf_sharedteams",
+      "ConnectionId": "__TEAMS_CONNECTION_ID__",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_teams"
+    },
+    {
+      "LogicalName": "hf_sharedsharepointonline",
+      "ConnectionId": "__SHAREPOINT_CONNECTION_ID__",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+    }
+  ]
+}

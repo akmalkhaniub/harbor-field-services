@@ -1,0 +1,10 @@
+{
+  "name": "harbor-knowledge",
+  "fields": [
+    { "name": "id", "type": "Edm.String", "key": true, "filterable": true },
+    { "name": "title", "type": "Edm.String", "searchable": true, "filterable": true },
+    { "name": "content", "type": "Edm.String", "searchable": true },
+    { "name": "accountCode", "type": "Edm.String", "filterable": true, "facetable": false },
+    { "name": "groupIds", "type": "Collection(Edm.String)", "filterable": true }
+  ]
+}

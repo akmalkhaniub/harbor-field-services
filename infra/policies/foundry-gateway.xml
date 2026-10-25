@@ -1,0 +1,27 @@
+<policies>
+  <inbound>
+    <base />
+    <set-header name="x-harbor-gateway" exists-action="override">
+      <value>apim</value>
+    </set-header>
+    <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
+    <choose>
+      <when condition="@(context.Subscription != null &amp;&amp; context.Subscription.Name.Equals(&quot;approve-summary&quot;, StringComparison.OrdinalIgnoreCase))">
+        <set-backend-service backend-id="foundry-strong" />
+      </when>
+      <otherwise>
+        <set-backend-service backend-id="foundry-mini" />
+      </otherwise>
+    </choose>
+    <llm-token-limit counter-key="@(context.Subscription.Id)" tokens-per-minute="2000" estimate-prompt-tokens="false" remaining-tokens-variable-name="remainingTokens" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
